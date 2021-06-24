@@ -56,6 +56,9 @@ public class WireGuardAdapter {
     /// Adapter state.
     private var state: State = .stopped
 
+    /// A lock used for synchronizing access to public properties.
+    private let lock = NSLock()
+
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
         var ctlInfo = ctl_info()
@@ -120,6 +123,20 @@ public class WireGuardAdapter {
             } else {
                 return nil
             }
+        }
+    }
+
+    private var _cancelTunnelWhenOffline = false
+    public var cancelTunnelWhenOffline: Bool {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _cancelTunnelWhenOffline
+        }
+        set {
+            lock.lock()
+            _cancelTunnelWhenOffline = newValue
+            lock.unlock()
         }
     }
 
@@ -435,6 +452,13 @@ public class WireGuardAdapter {
 
                 self.state = .temporaryShutdown(settingsGenerator)
                 wgTurnOff(handle)
+
+                // The tunnel configuration should have `includeAllNetworks = true` and active on-demand to ensure the
+                // leak free and automatic tunnel restart.
+                if self.cancelTunnelWhenOffline, path.availableInterfaces.count < 2 {
+                    self.logHandler(.verbose, "No active network interfaces, cancelling packet tunnel.")
+                    self.packetTunnelProvider?.cancelTunnelWithError(nil)
+                }
             }
 
         case .temporaryShutdown(let settingsGenerator):
