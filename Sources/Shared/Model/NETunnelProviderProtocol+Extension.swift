@@ -26,6 +26,14 @@ extension NETunnelProviderProtocol {
         providerConfiguration = ["UID": getuid()]
         #endif
 
+        if #available(iOS 15.0, /*macOS 12.0,*/ *) {
+            // Send all traffic via the tunnel and drop all traffic while the tunnel is down.
+            includeAllNetworks = true
+
+            // Allow LAN networking outside of the tunnel.
+            excludeLocalNetworks = true
+        }
+
         let endpoints = tunnelConfiguration.peers.compactMap { $0.endpoint }
         if endpoints.count == 1 {
             serverAddress = endpoints[0].stringRepresentation

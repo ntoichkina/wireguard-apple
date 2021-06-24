@@ -8,9 +8,17 @@ import os
 class PacketTunnelProvider: NEPacketTunnelProvider {
 
     private lazy var adapter: WireGuardAdapter = {
-        return WireGuardAdapter(with: self) { logLevel, message in
+        let adapter = WireGuardAdapter(with: self) { logLevel, message in
             wg_log(logLevel.osLogLevel, message: message)
         }
+
+        if #available(iOS 15.0, /*macOS 12.0,*/ *) {
+            // Only enable it on iOS 15 and macOS 12 where includeAllNetwork works properly with WireGuard.
+            // TODO: only do that when self.protocolConfiguration?.includeAllNetworks == true and enabled on-demand.
+            adapter.cancelTunnelWhenOffline = true
+        }
+
+        return adapter
     }()
 
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
